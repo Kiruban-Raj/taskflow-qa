@@ -33,7 +33,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - run: pip install -e . -e libs/testkit ".[lint]"
+      - run: pip install -e ".[lint]" -e libs/testkit
       - run: ruff check .
       - run: ruff format --check .
       - name: Lint the workflows themselves
@@ -59,7 +59,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - run: pip install -e . -e libs/testkit ".[test]"
+      - run: pip install -e ".[test]" -e libs/testkit
       - name: Run unit layer
         # No --cov here on purpose: the unit layer alone only touches
         # app/rules.py, so a coverage gate on it would either fail or have
@@ -87,7 +87,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - run: pip install -e . -e libs/testkit ".[test]"
+      - run: pip install -e ".[test]" -e libs/testkit
       - name: Verify the app against contracts/openapi.yaml
         run: pytest suites/contract -m contract --junitxml=junit-contract.xml
       - name: Enforce the time budget
@@ -111,7 +111,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - run: pip install -e . -e libs/testkit ".[test]"
+      - run: pip install -e ".[test]" -e libs/testkit
       - name: Run component layer
         run: pytest suites/component -m component --junitxml=junit-component.xml
       - name: Enforce the time budget
@@ -137,7 +137,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - run: pip install -e . -e libs/testkit ".[test]" ".[journey]"
+      - run: pip install -e ".[test,journey]" -e libs/testkit
       - name: Install Chromium
         run: python -m playwright install --with-deps chromium
       - name: Run journeys
@@ -179,7 +179,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - run: pip install -e . -e libs/testkit ".[test]"
+      - run: pip install -e ".[test]" -e libs/testkit
       - name: Measure coverage across unit, contract and component
         # fail_under lives in pyproject.toml so the threshold is reviewable
         # in a diff rather than buried in a CI command.

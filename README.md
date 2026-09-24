@@ -167,7 +167,7 @@ be an end-to-end test?" into a question with an enforced answer.
 python -m venv .venv && .venv/Scripts/activate      # Windows
 python -m venv .venv && source .venv/bin/activate   # macOS / Linux
 
-pip install -e . -e libs/testkit ".[test]"
+pip install -e ".[test]" -e libs/testkit
 
 pytest suites/unit          # 39 tests, ~5s
 pytest suites/contract      # 15 tests, ~2s
@@ -177,7 +177,7 @@ pytest suites/component     # 44 tests, ~15s
 For the browser layer:
 
 ```bash
-pip install ".[journey]"
+pip install -e ".[test,journey]"
 python -m playwright install chromium
 pytest suites/journey       # 9 tests, ~10s — starts its own server
 ```

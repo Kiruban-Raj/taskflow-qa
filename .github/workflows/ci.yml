@@ -36,6 +36,13 @@ jobs:
       - run: pip install -e . -e libs/testkit ".[lint]"
       - run: ruff check .
       - run: ruff format --check .
+      - name: Lint the workflows themselves
+        # A malformed workflow does not fail a job - it stops the run from
+        # being created at all, with no jobs and no annotations to read.
+        # Catching that here is much cheaper than bisecting it by pushing.
+        run: |
+          pip install actionlint-py
+          actionlint -shellcheck= -pyflakes= .github/workflows/*.yml
       - name: Type-check the domain rules
         # Strict on app/rules.py, where the decisions live; advisory elsewhere.
         run: mypy app/rules.py
@@ -194,7 +201,10 @@ jobs:
         # A single required check for branch protection, so adding a layer
         # above does not mean reconfiguring the protected-branch rules.
         run: |
-          results='${{ join(needs.*.result, " ") }}'
+          # Single quotes inside the expression: Actions expressions have
+          # no double-quoted string literal, and using one makes the whole
+          # workflow file unparseable rather than failing at runtime.
+          results='${{ join(needs.*.result, ' ') }}'
           echo "Layer results: $results"
           for result in $results; do
             if [ "$result" != "success" ]; then

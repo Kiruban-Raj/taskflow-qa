@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "taskflow-qa"
+version = "1.0.0"
+description = "A small task manager and the layered, shift-left test architecture around it."
+requires-python = ">=3.11"
+
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "sqlalchemy>=2.0",
+  "pydantic>=2.9",
+  "pyjwt>=2.9",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Split by layer so a job installs only what it needs. The unit layer must
+# stay installable without a browser or a database driver — if it isn't,
+# it isn't really a unit layer.
+test = [
+  "pytest>=8.3",
+  "pytest-cov>=5.0",
+  "pytest-xdist>=3.6",
+  "hypothesis>=6.112",
+  "httpx>=0.27",
+  "jsonschema>=4.23",
+  "taskflow-testkit",
+]
+journey = ["pytest-playwright>=0.5"]
+lint = ["ruff>=0.6", "mypy>=1.11"]
+
+# Only `app` ships. libs/, suites/, contracts/ and tooling/ are not part of
+# the distributable — without this, setuptools' auto-discovery sees several
+# top-level directories and refuses to guess.
+[tool.setuptools]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+# pythonpath means no sys.path hacking in any conftest, and tests can be run
+# from the repository root or from inside a suite directory.
+pythonpath = ["."]
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+  "unit: pure logic, no I/O — must stay in the sub-second range",
+  "contract: verifies the app against contracts/openapi.yaml",
+  "component: the app plus real persistence, driven in-process",
+  "journey: end-to-end through a real browser",
+  "security: authn/authz and negative-path tests",
+  "slow: deliberately excluded from the pre-merge path",
+]
+filterwarnings = ["error::DeprecationWarning:app.*"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["*/static/*"]
+
+[tool.coverage.report]
+# The bar is on the domain rules, not on glue. Set once the suite is real;
+# raising it is a deliberate decision, never an accident.
+fail_under = 85
+show_missing = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PT"]
+ignore = ["B008"]  # FastAPI's Depends() in defaults is the documented idiom
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+warn_redundant_casts = true
+# app/rules.py is the code most worth type-checking strictly: it holds the
+# decisions. The HTTP glue is checked loosely.
+[[tool.mypy.overrides]]
+module = "app.rules"
+disallow_untyped_defs = true

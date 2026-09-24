@@ -1,0 +1,205 @@
+name: CI
+
+# The pipeline is the test pyramid, executed left to right.
+#
+# Each layer is a separate job so a failure names the layer, and each job
+# carries the time budget for that layer twice: `timeout-minutes` as a hard
+# stop, and tooling/check_budget.py as the soft contract that fails the
+# build well before the hard stop is reached.
+#
+# Ordering is deliberate. The cheapest layers gate the expensive ones, so a
+# broken domain rule costs twenty seconds rather than a browser run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ---------------------------------------------------------------- static
+  # No tests at all: types and lint are the cheapest defect filter there is.
+  static:
+    name: "Static analysis"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e . -e libs/testkit ".[lint]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - name: Type-check the domain rules
+        # Strict on app/rules.py, where the decisions live; advisory elsewhere.
+        run: mypy app/rules.py
+
+  # ------------------------------------------------------------------ unit
+  unit:
+    name: "Unit (budget 15s)"
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e . -e libs/testkit ".[test]"
+      - name: Run unit layer
+        # No --cov here on purpose: the unit layer alone only touches
+        # app/rules.py, so a coverage gate on it would either fail or have
+        # to be set so low it means nothing. Coverage is measured across
+        # the in-process layers together, in the `coverage` job below.
+        run: pytest suites/unit -m unit --junitxml=junit-unit.xml
+      - name: Enforce the time budget
+        if: always()
+        run: python tooling/check_budget.py junit-unit.xml 15 unit
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-unit
+          path: junit-unit.xml
+
+  # -------------------------------------------------------------- contract
+  contract:
+    name: "Contract (budget 30s)"
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e . -e libs/testkit ".[test]"
+      - name: Verify the app against contracts/openapi.yaml
+        run: pytest suites/contract -m contract --junitxml=junit-contract.xml
+      - name: Enforce the time budget
+        if: always()
+        run: python tooling/check_budget.py junit-contract.xml 30 contract
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-contract
+          path: junit-contract.xml
+
+  # ------------------------------------------------------------- component
+  component:
+    name: "Component (budget 60s)"
+    needs: [unit, contract]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e . -e libs/testkit ".[test]"
+      - name: Run component layer
+        run: pytest suites/component -m component --junitxml=junit-component.xml
+      - name: Enforce the time budget
+        if: always()
+        run: python tooling/check_budget.py junit-component.xml 60 component
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-component
+          path: junit-component.xml
+
+  # --------------------------------------------------------------- journey
+  # The only layer that needs a browser, and therefore the last one to run
+  # and the one with the tightest cap on test count.
+  journey:
+    name: "Journey (budget 300s)"
+    needs: component
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e . -e libs/testkit ".[test]" ".[journey]"
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Run journeys
+        # The suite starts its own server on a free port; no service block
+        # needed, and the same command works locally.
+        run: |
+          pytest suites/journey -m journey \
+            --junitxml=junit-journey.xml \
+            --screenshot=only-on-failure \
+            --video=retain-on-failure \
+            --tracing=retain-on-failure \
+            --output=test-results
+      - name: Enforce the time budget
+        if: always()
+        run: python tooling/check_budget.py junit-journey.xml 300 journey
+      - name: Publish traces and screenshots
+        # The whole point of a trace is that it exists when the run is red.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-journey
+          path: |
+            junit-journey.xml
+            test-results/
+
+  # -------------------------------------------------------------- coverage
+  # Measured across the in-process layers together, because that is the set
+  # that is meant to cover the application. Journeys are excluded on
+  # purpose: counting browser tests towards coverage rewards exactly the
+  # wrong thing.
+  coverage:
+    name: "Coverage (>=85%)"
+    needs: component
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e . -e libs/testkit ".[test]"
+      - name: Measure coverage across unit, contract and component
+        # fail_under lives in pyproject.toml so the threshold is reviewable
+        # in a diff rather than buried in a CI command.
+        run: pytest suites/unit suites/contract suites/component --cov --cov-report=xml --cov-report=term
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage.xml
+
+  # ----------------------------------------------------------------- gate
+  gate:
+    name: "All layers green"
+    needs: [static, unit, contract, component, journey, coverage]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirm no layer failed or was skipped
+        # A single required check for branch protection, so adding a layer
+        # above does not mean reconfiguring the protected-branch rules.
+        run: |
+          results='${{ join(needs.*.result, " ") }}'
+          echo "Layer results: $results"
+          for result in $results; do
+            if [ "$result" != "success" ]; then
+              echo "::error::A layer did not succeed: $results"
+              exit 1
+            fi
+          done
+          echo "Every layer passed."

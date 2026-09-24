@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Test + coverage output
+.pytest_cache/
+.hypothesis/
+.coverage
+coverage.xml
+junit-*.xml
+test-results/
+
+# Local database files
+*.db
+*.db-wal
+*.db-shm
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

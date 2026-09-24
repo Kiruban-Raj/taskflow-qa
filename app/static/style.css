@@ -1,0 +1,29 @@
+:root { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1f2933; }
+body { margin: 0; background: #f4f6f8; }
+.card { max-width: 22rem; margin: 6rem auto; background: #fff; padding: 2rem;
+        border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.card h1 { margin: 0 0 .25rem; }
+label { display: block; margin: 1rem 0 .25rem; font-size: .85rem; font-weight: 600; }
+input, select { width: 100%; padding: .55rem .6rem; border: 1px solid #cbd2d9;
+                border-radius: 6px; font-size: .95rem; box-sizing: border-box; }
+button { margin-top: 1rem; padding: .55rem 1rem; border: 0; border-radius: 6px;
+         background: #2a6df4; color: #fff; font-size: .95rem; cursor: pointer; }
+button.secondary { background: #e4e7eb; color: #1f2933; }
+button.danger { background: #d64545; }
+.error { color: #b91c1c; font-size: .875rem; }
+.muted { color: #616e7c; } .small { font-size: .8rem; }
+.topbar { display: flex; align-items: center; gap: .75rem; padding: .75rem 1.25rem;
+          background: #fff; border-bottom: 1px solid #e4e7eb; }
+.topbar .spacer { flex: 1; } .topbar button { margin: 0; }
+.wrap { max-width: 44rem; margin: 2rem auto; padding: 0 1rem; }
+#create-form, .filters { display: flex; gap: .5rem; align-items: center; }
+#create-form { margin-bottom: 1rem; } #create-form button { margin: 0; white-space: nowrap; }
+.filters { margin: 1rem 0; }
+ul { list-style: none; padding: 0; }
+li { background: #fff; border: 1px solid #e4e7eb; border-radius: 8px;
+     padding: .75rem 1rem; margin-bottom: .5rem; display: flex; align-items: center; gap: .75rem; }
+li .title { font-weight: 600; } li .spacer { flex: 1; }
+.status { font-size: .75rem; padding: .15rem .5rem; border-radius: 999px; background: #e4e7eb; }
+.status[data-status="in_progress"] { background: #fde68a; }
+.status[data-status="done"] { background: #bbf7d0; }
+li button { margin: 0; font-size: .8rem; padding: .3rem .6rem; }

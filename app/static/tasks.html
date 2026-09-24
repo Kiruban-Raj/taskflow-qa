@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TaskFlow — Tasks</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <strong>TaskFlow</strong>
+    <span class="spacer"></span>
+    <span data-testid="current-user" id="current-user"></span>
+    <button data-testid="logout-button" id="logout-button">Log out</button>
+  </header>
+
+  <main class="wrap">
+    <form id="create-form" data-testid="create-task-form">
+      <input id="new-title" data-testid="new-task-title" placeholder="What needs doing?" required />
+      <input id="new-description" data-testid="new-task-description" placeholder="Notes (optional)" />
+      <button type="submit" data-testid="create-task-submit">Add task</button>
+    </form>
+    <p id="task-error" data-testid="task-error" class="error" hidden></p>
+
+    <div class="filters">
+      <input id="search" data-testid="filter-search" placeholder="Search titles…" />
+      <select id="status-filter" data-testid="filter-status">
+        <option value="">All statuses</option>
+        <option value="todo">To do</option>
+        <option value="in_progress">In progress</option>
+        <option value="done">Done</option>
+      </select>
+    </div>
+
+    <p id="empty-state" data-testid="empty-state" hidden>No tasks yet.</p>
+    <ul id="task-list" data-testid="task-list"></ul>
+  </main>
+
+  <script src="app.js"></script>
+  <script src="tasks.js"></script>
+</body>
+</html>

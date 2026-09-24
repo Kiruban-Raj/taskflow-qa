@@ -1,0 +1,38 @@
+# The UI contract.
+#
+# Every data-testid the automation is allowed to depend on is declared here,
+# once. libs/testkit generates selector constants from this file, so both the
+# Playwright suite and any future mobile suite import the same names.
+#
+# Why this exists: without it, renaming one data-testid means hunting through
+# every page object in every suite and finding out at runtime what you missed.
+# With it, the rename is one line here and the tests fail to *import* rather
+# than failing mysteriously mid-run.
+#
+# Rule: if a test needs to address an element, it gets an entry here. No
+# CSS-structure or text-content selectors in page objects.
+
+login:
+  form: login-form
+  username: login-username
+  password: login-password
+  submit: login-submit
+  error: login-error
+
+tasks:
+  current_user: current-user
+  logout_button: logout-button
+  create_form: create-task-form
+  new_title: new-task-title
+  new_description: new-task-description
+  create_submit: create-task-submit
+  error: task-error
+  filter_search: filter-search
+  filter_status: filter-status
+  empty_state: empty-state
+  list: task-list
+  item: task-item
+  item_title: task-title
+  item_status: task-status
+  item_advance: task-advance
+  item_delete: task-delete

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TaskFlow — Sign in</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="card">
+    <h1>TaskFlow</h1>
+    <p class="muted">Sign in to manage your tasks.</p>
+
+    <form id="login-form" data-testid="login-form">
+      <label for="username">Username</label>
+      <input id="username" name="username" data-testid="login-username" autocomplete="username" required />
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" data-testid="login-password"
+             autocomplete="current-password" required />
+
+      <button type="submit" data-testid="login-submit">Sign in</button>
+    </form>
+
+    <p id="login-error" data-testid="login-error" class="error" hidden></p>
+    <p class="muted small">Demo account: <code>demo</code> / <code>demo1234</code></p>
+  </main>
+  <script src="app.js"></script>
+  <script src="login.js"></script>
+</body>
+</html>

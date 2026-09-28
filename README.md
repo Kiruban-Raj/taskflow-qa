@@ -94,8 +94,10 @@ The rules themselves are not re-tested here — only that the endpoints
 
 ### Journey — `suites/journey`
 
-Nine tests. Each earns its place by covering something no cheaper layer
-structurally can: real navigation, real `localStorage`, real rendering.
+Eleven tests per customer. Each earns its place by covering something no
+cheaper layer structurally can: real navigation, real `localStorage`, real
+rendering, and the branding and feature visibility that only exist in a
+browser.
 
 Selectors come from `contracts/ui-contract.yaml` via generated constants, so a
 renamed `data-testid` is an **import-time error naming the attribute**, not a
@@ -205,7 +207,7 @@ def testkit_transport() -> str:
 Every layer has a budget, enforced in CI by `tooling/check_budget.py`:
 
 ```
-unit: 39 tests in 4.74s (budget 15s, 32% used)
+unit: 39 tests in 1.19s (budget 15s, 8% used)
 ```
 
 A test pyramid does not collapse because someone decides to write slow tests. It

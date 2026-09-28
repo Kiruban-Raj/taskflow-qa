@@ -27,6 +27,12 @@ BUDGETS = {
 
 
 def total_seconds(junit_path: Path) -> tuple[float, int]:
+    """Add up the time and test count across a JUnit report.
+
+    Handles both shapes a JUnit file comes in: a <testsuites> element
+    wrapping several suites, or a single bare <testsuite>. Different tools
+    emit different ones, and assuming either gives a crash on the other.
+    """
     root = ET.parse(junit_path).getroot()
     suites = root.findall("testsuite") if root.tag == "testsuites" else [root]
     seconds = sum(float(s.get("time", 0) or 0) for s in suites)
@@ -35,6 +41,15 @@ def total_seconds(junit_path: Path) -> tuple[float, int]:
 
 
 def main() -> int:
+    """Compare one layer's runtime against its budget and report the verdict.
+
+    Exit code 0 means inside budget, 1 means over (or the report is
+    missing, which usually means the tests never ran at all - a silent
+    success would be worse than a failure).
+
+    Output uses GitHub's ::error:: and ::notice:: prefixes so the result is
+    surfaced on the run summary rather than buried in the log.
+    """
     if len(sys.argv) < 3:
         print(__doc__)
         return 2

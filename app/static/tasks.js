@@ -95,9 +95,26 @@ document.getElementById("logout-button").addEventListener("click", async () => {
   }
 });
 
+// Show the bulk-delete button only for customers who have the feature.
+// Again: this is tidiness, not security. The server refuses the call
+// regardless, and there is a test that calls the endpoint directly as a
+// customer without the feature to prove it.
+async function applyFeatures(tenant) {
+  if (!tenant) return;
+  const button = document.getElementById("bulk-delete");
+  if (!button) return;
+
+  if (tenant.features.includes("bulk_delete")) {
+    button.hidden = false;
+    button.addEventListener("click", () => mutate(() => Api.bulkDeleteDone()));
+  }
+}
+
 if (requireSession()) {
   Api.me()
     .then((user) => { document.getElementById("current-user").textContent = user.username; })
     .catch(() => { clearSession(); window.location.href = "/app/index.html"; });
+
+  applyBranding().then(applyFeatures);
   refresh();
 }

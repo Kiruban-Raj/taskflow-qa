@@ -10,6 +10,7 @@ pytestmark = [pytest.mark.component, pytest.mark.security]
 
 
 def test_login_with_valid_credentials_returns_a_token(transport, user):
+    """The happy path: correct credentials produce a usable bearer token."""
     response = transport.post(
         "/auth/login", json={"username": user.username, "password": user.password}
     )
@@ -20,6 +21,11 @@ def test_login_with_valid_credentials_returns_a_token(transport, user):
 
 
 def test_token_identifies_the_right_user(transport, user):
+    """The token really identifies the user it was issued for.
+
+    Without this, a bug that issued everyone the same token would still
+    pass every other test in this file.
+    """
     response = transport.get("/me", headers=user.headers)
 
     assert response.status_code == 200
@@ -55,6 +61,7 @@ def test_password_is_never_echoed_back(transport, user):
 
 
 def test_request_without_a_token_is_rejected(transport):
+    """Protected routes refuse anonymous callers."""
     response = transport.get("/me")
 
     assert response.status_code == 401
@@ -71,6 +78,11 @@ def test_request_without_a_token_is_rejected(transport):
     ],
 )
 def test_malformed_authorization_headers_are_rejected(transport, header, expected_code):
+    """Every broken Authorization header shape is refused, with the right code.
+
+    The distinction matters to whoever is debugging: "missing" and
+    "invalid" point at different bugs in the calling code.
+    """
     response = transport.get("/me", headers={"Authorization": header} if header else {})
 
     assert response.status_code == 401

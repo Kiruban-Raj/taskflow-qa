@@ -15,6 +15,11 @@ pytestmark = [pytest.mark.component, pytest.mark.security]
 
 
 def test_factory_returns_404_when_the_flag_is_unset(transport, monkeypatch):
+    """With the flag absent, the user factory does not exist at all.
+
+    404 rather than 403, so the endpoint's existence is not even
+    advertised to someone probing for it.
+    """
     monkeypatch.delenv("ENABLE_TEST_ENDPOINTS", raising=False)
 
     response = transport.post("/test/users", params={"username": "sneaky"})

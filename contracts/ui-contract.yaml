@@ -12,6 +12,10 @@
 # Rule: if a test needs to address an element, it gets an entry here. No
 # CSS-structure or text-content selectors in page objects.
 
+# Shared by both pages.
+common:
+  product_name: product-name
+
 login:
   form: login-form
   username: login-username
@@ -36,3 +40,7 @@ tasks:
   item_status: task-status
   item_advance: task-advance
   item_delete: task-delete
+  # Only rendered for customers who have bought the feature. The tests use
+  # it to check it is absent for others - and then call the API directly to
+  # check the server refuses too, because a hidden button is not a guard.
+  bulk_delete: bulk-delete

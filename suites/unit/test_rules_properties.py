@@ -40,6 +40,7 @@ def test_normalising_is_idempotent(raw):
 
 @given(st.text())
 def test_a_normalised_title_never_has_leading_or_trailing_space(raw):
+    """Whatever goes in, the result never has edge whitespace."""
     result = normalise_title(raw)
     assert result == result.strip()
 
@@ -68,6 +69,9 @@ def test_validate_title_either_returns_a_normalised_title_or_raises(raw):
 
 @given(st.text(min_size=TITLE_MAX_LENGTH + 1, max_size=TITLE_MAX_LENGTH + 50))
 def test_titles_over_the_limit_always_raise_unless_whitespace_collapses_them(raw):
+    """Long input is rejected - unless collapsing whitespace brought it
+    back under the limit, which is the correct and easily-missed case.
+    """
     normalised = normalise_title(raw)
     if len(normalised) > TITLE_MAX_LENGTH:
         with pytest.raises(RuleViolation):
@@ -115,5 +119,6 @@ def test_a_query_matching_the_title_always_matches(status, title, fragment):
 
 @given(statuses, st.text())
 def test_status_filter_is_exact(status, title):
+    """For any status and title, the filter matches that status and no other."""
     for candidate in TaskStatus:
         assert matches_filter(status, title, status=candidate) is (status == candidate)

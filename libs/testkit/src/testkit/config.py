@@ -17,6 +17,13 @@ def repo_root() -> Path:
 
 @dataclass(frozen=True)
 class Settings:
+    """Everything the test run needs to know about its environment.
+
+    Read from environment variables once, then passed around as a value.
+    The alternative - calling os.getenv() wherever it is needed - makes it
+    impossible to see at a glance what the suite can be configured with.
+    """
+
     base_url: str
     ui_url: str
     demo_username: str
@@ -24,6 +31,12 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
+        """Build settings from the environment, with workable defaults.
+
+        Defaults matter: `pytest` with no setup at all should still run.
+        Anyone needing something different sets TASKFLOW_BASE_URL, and the
+        same suite then points at a deployed environment unchanged.
+        """
         base = os.getenv("TASKFLOW_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
         return cls(
             base_url=base,

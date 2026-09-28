@@ -37,14 +37,25 @@ pytestmark = pytest.mark.unit
     ],
 )
 def test_titles_are_normalised(raw, expected):
+    """Surrounding and repeated whitespace collapses to single spaces.
+
+    Two titles differing only by padding are the same title; storing the
+    padded form would make search and duplicate-detection lie.
+    """
     assert normalise_title(raw) == expected
 
 
 def test_title_at_the_maximum_length_is_accepted():
+    """The limit is inclusive - exactly 120 characters is fine."""
     assert validate_title("x" * TITLE_MAX_LENGTH) == "x" * TITLE_MAX_LENGTH
 
 
 def test_title_one_over_the_maximum_is_rejected():
+    """One character past the limit fails, with a code the API can map to 422.
+
+    Tested at the boundary rather than with something obviously huge,
+    because off-by-one is the error that actually happens.
+    """
     with pytest.raises(RuleViolation) as exc:
         validate_title("x" * (TITLE_MAX_LENGTH + 1))
     assert exc.value.code == "title_too_long"
@@ -60,10 +71,16 @@ def test_whitespace_only_titles_are_rejected(raw):
 
 
 def test_missing_description_becomes_empty_string():
+    """No description means "", never None.
+
+    The API contract declares description as a plain string, so returning
+    None would break every client generated from it.
+    """
     assert validate_description(None) == ""
 
 
 def test_description_over_the_maximum_is_rejected():
+    """Too long is refused with its own distinct code."""
     with pytest.raises(RuleViolation) as exc:
         validate_description("x" * (DESCRIPTION_MAX_LENGTH + 1))
     assert exc.value.code == "description_too_long"
@@ -82,6 +99,7 @@ def test_description_over_the_maximum_is_rejected():
     ],
 )
 def test_legal_transitions_are_allowed(current, target):
+    """Every move the state machine permits is accepted."""
     assert validate_transition(current, target) is target
 
 
@@ -93,6 +111,11 @@ def test_legal_transitions_are_allowed(current, target):
     ],
 )
 def test_illegal_transitions_are_rejected(current, target):
+    """The two forbidden moves are refused.
+
+    todo -> done would mean finishing work never started; done -> todo
+    would lose the fact that the work had been done at all.
+    """
     with pytest.raises(RuleViolation) as exc:
         validate_transition(current, target)
     assert exc.value.code == "illegal_transition"
@@ -112,6 +135,7 @@ def test_every_status_has_a_declared_transition_set():
 
 
 def test_no_status_is_a_dead_end():
+    """No task can ever get permanently stuck."""
     for status, targets in ALLOWED_TRANSITIONS.items():
         assert targets, f"{status.value} has no way out"
 
@@ -120,22 +144,34 @@ def test_no_status_is_a_dead_end():
 
 
 def test_filter_with_no_criteria_matches_everything():
+    """An unfiltered list returns everything."""
     assert matches_filter(TaskStatus.TODO, "anything")
 
 
 def test_status_filter_matches_only_that_status():
+    """Filtering by status is exact, not a partial match."""
     assert matches_filter(TaskStatus.DONE, "t", status=TaskStatus.DONE)
     assert not matches_filter(TaskStatus.TODO, "t", status=TaskStatus.DONE)
 
 
 @pytest.mark.parametrize("query", ["milk", "MILK", "  milk  ", "ilk"])
 def test_query_matching_is_case_insensitive_and_trimmed(query):
+    """Search ignores case and surrounding spaces, and matches inside words.
+
+    All four inputs describe the same user intent, so all four must match.
+    """
     assert matches_filter(TaskStatus.TODO, "Buy Milk", query=query)
 
 
 def test_query_that_does_not_appear_excludes_the_task():
+    """A search term that is genuinely absent filters the task out."""
     assert not matches_filter(TaskStatus.TODO, "Buy milk", query="bread")
 
 
 def test_empty_query_is_ignored_rather_than_matching_nothing():
+    """An empty search box shows everything, rather than nothing.
+
+    The naive implementation treats "" as a filter that matches nothing,
+    and the list mysteriously empties as you clear the box.
+    """
     assert matches_filter(TaskStatus.TODO, "Buy milk", query="")

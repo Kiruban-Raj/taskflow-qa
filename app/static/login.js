@@ -1,3 +1,5 @@
+applyBranding();
+
 document.getElementById("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const errorEl = document.getElementById("login-error");

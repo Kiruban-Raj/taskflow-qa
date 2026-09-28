@@ -14,6 +14,11 @@ pytestmark = [pytest.mark.component]
 
 
 def test_create_returns_the_task_in_todo(transport, user):
+    """A new task comes back fully populated and always starts as `todo`.
+
+    The starting status is asserted explicitly: a client must not be able
+    to create work that is already marked finished.
+    """
     response = transport.post(
         "/tasks",
         json={"title": "Write the report", "description": "By Friday"},
@@ -29,6 +34,11 @@ def test_create_returns_the_task_in_todo(transport, user):
 
 
 def test_created_task_is_retrievable(transport, user, tasks):
+    """What was created can actually be fetched back.
+
+    Separate from the create test on purpose - a handler that returns the
+    right JSON without committing would pass that one and fail this.
+    """
     task = tasks.create("Fetch me")
 
     response = transport.get(f"/tasks/{task.id}", headers=user.headers)
@@ -46,6 +56,7 @@ def test_title_is_normalised_on_create(transport, user):
 
 
 def test_whitespace_only_title_is_rejected(transport, user):
+    """A title of only spaces is refused with the right code."""
     response = transport.post("/tasks", json={"title": "   "}, headers=user.headers)
 
     assert response.status_code == 422
@@ -78,6 +89,7 @@ def test_list_returns_only_the_callers_tasks(transport, users):
 
 
 def test_list_is_newest_first(transport, user, tasks):
+    """Ordering is newest-first, as the contract promises."""
     for title in ("first", "second", "third"):
         tasks.create(title)
 
@@ -87,11 +99,13 @@ def test_list_is_newest_first(transport, user, tasks):
 
 
 def test_list_starts_empty_for_a_new_user(transport, user):
+    """A new user's list is genuinely empty, not seeded with anything."""
     assert transport.get("/tasks", headers=user.headers).json() == []
 
 
 @pytest.mark.parametrize("query", ["milk", "MILK", "ilk"])
 def test_search_filters_by_title(transport, user, tasks, query):
+    """Search matches case-insensitively and on partial words."""
     tasks.create("Buy milk")
     tasks.create("Walk the dog")
 
@@ -101,6 +115,7 @@ def test_search_filters_by_title(transport, user, tasks, query):
 
 
 def test_status_filter_narrows_the_list(transport, user, tasks):
+    """Filtering by status returns only tasks in that state."""
     done = tasks.create("Finished")
     tasks.create("Not started")
     tasks.advance_to(done, "done")
@@ -114,6 +129,11 @@ def test_status_filter_narrows_the_list(transport, user, tasks):
 
 
 def test_update_changes_the_title(transport, user, tasks):
+    """An updated title is returned AND persisted.
+
+    Both are checked, because a handler that returns the new value
+    without committing would otherwise look correct.
+    """
     task = tasks.create("Before")
 
     response = transport.patch(f"/tasks/{task.id}", json={"title": "After"}, headers=user.headers)
@@ -124,6 +144,11 @@ def test_update_changes_the_title(transport, user, tasks):
 
 
 def test_partial_update_leaves_other_fields_alone(transport, user, tasks):
+    """Sending one field changes only that field.
+
+    The point of PATCH. If omitted fields were blanked, any client
+    updating a status would silently wipe the description.
+    """
     task = tasks.create("Keep me", description="Keep this too")
 
     transport.patch(f"/tasks/{task.id}", json={"status": "in_progress"}, headers=user.headers)
@@ -135,6 +160,7 @@ def test_partial_update_leaves_other_fields_alone(transport, user, tasks):
 
 
 def test_legal_status_progression_is_persisted(transport, user, tasks):
+    """A task can be walked through the full legal lifecycle."""
     task = tasks.create()
 
     for target in ("in_progress", "done"):
@@ -146,6 +172,7 @@ def test_legal_status_progression_is_persisted(transport, user, tasks):
 
 
 def test_illegal_transition_is_rejected_by_the_endpoint(transport, user, tasks):
+    """The endpoint enforces the state machine, not just the rules module."""
     task = tasks.create()
 
     response = transport.patch(f"/tasks/{task.id}", json={"status": "done"}, headers=user.headers)
@@ -164,6 +191,7 @@ def test_rejected_transition_leaves_the_task_unchanged(transport, user, tasks):
 
 
 def test_updated_at_moves_but_created_at_does_not(transport, user, tasks):
+    """Editing touches updated_at and leaves created_at alone."""
     task = tasks.create()
     before = transport.get(f"/tasks/{task.id}", headers=user.headers).json()
 
@@ -178,6 +206,7 @@ def test_updated_at_moves_but_created_at_does_not(transport, user, tasks):
 
 
 def test_delete_removes_the_task(transport, user, tasks):
+    """A deleted task is really gone."""
     task = tasks.create()
 
     assert transport.delete(f"/tasks/{task.id}", headers=user.headers).status_code == 204
@@ -185,6 +214,7 @@ def test_delete_removes_the_task(transport, user, tasks):
 
 
 def test_deleting_twice_returns_not_found(transport, user, tasks):
+    """Deleting an already-deleted task is a clean 404, not a crash."""
     task = tasks.create()
     transport.delete(f"/tasks/{task.id}", headers=user.headers)
 
@@ -221,6 +251,7 @@ def test_another_users_task_is_not_reachable(transport, users, method, payload):
 
 @pytest.mark.security
 def test_a_failed_hijack_leaves_the_original_intact(transport, users):
+    """A refused cross-user write changes nothing for the real owner."""
     from testkit.factories import TaskFactory
 
     owner = users.create()

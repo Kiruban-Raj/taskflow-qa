@@ -33,6 +33,7 @@ def signed_in(page, ui_url, user) -> TasksPage:
 
 
 def test_signing_in_reaches_the_task_list(page, ui_url, user):
+    """Signing in through the real UI lands on the task list as the right user."""
     LoginPage(page, ui_url).open().sign_in(user.username, user.password)
 
     expect(page).to_have_url(re.compile(r"tasks\.html$"))
@@ -40,6 +41,11 @@ def test_signing_in_reaches_the_task_list(page, ui_url, user):
 
 
 def test_bad_credentials_show_an_error_and_stay_put(page, ui_url, user):
+    """A rejected login shows the message and does NOT navigate away.
+
+    Staying put matters: a redirect on failure would lose whatever the
+    user had typed.
+    """
     login = LoginPage(page, ui_url).open()
 
     login.sign_in(user.username, "definitely-wrong")
@@ -61,6 +67,7 @@ def test_task_page_without_a_session_redirects_to_login(page, ui_url):
 
 
 def test_logging_out_returns_to_login_and_invalidates_the_session(signed_in, page, ui_url):
+    """Logging out returns to the login page and really ends the session."""
     signed_in.log_out()
     expect(page).to_have_url(re.compile(r"index\.html$"))
 
@@ -95,11 +102,13 @@ def test_full_task_lifecycle_through_the_ui(signed_in):
 
 
 def test_empty_state_shows_for_a_new_user(signed_in):
+    """A brand-new user sees the empty-state message, not a blank page."""
     expect(signed_in.empty_state).to_be_visible()
     expect(signed_in.items).to_have_count(0)
 
 
 def test_search_narrows_the_visible_list(signed_in):
+    """Typing in the search box filters the rows on screen."""
     signed_in.add_task("Buy milk")
     expect(signed_in.items).to_have_count(1)
     signed_in.add_task("Walk the dog")
@@ -112,6 +121,7 @@ def test_search_narrows_the_visible_list(signed_in):
 
 
 def test_status_filter_narrows_the_visible_list(signed_in):
+    """Choosing a status in the dropdown filters the rows on screen."""
     signed_in.add_task("Started task")
     expect(signed_in.items).to_have_count(1)
     signed_in.add_task("Fresh task")
@@ -135,3 +145,54 @@ def test_server_side_validation_error_is_surfaced_to_the_user(signed_in, page):
     signed_in.add_task("   ")
 
     expect(signed_in.error).to_be_visible()
+
+
+# ------------------------------------------------------------- multi-tenant
+#
+# These two exist only because the product is multi-tenant. They run once per
+# customer, and each checks something that genuinely differs between them.
+
+
+def test_each_customer_sees_their_own_branding(page, ui_url, tenant):
+    """The page must show the product name from THIS customer's config file.
+
+    WHAT THIS PROVES
+        Branding is driven by configuration rather than hardcoded, and the
+        page picked up the right customer purely from the address it was
+        loaded from - nothing in the URL path or the page itself says who
+        the customer is.
+
+    WHY IT IS A BROWSER TEST
+        The API already publishes the name via /tenant, and a component
+        test checks that. What only a browser can show is that the page
+        actually fetches it and renders it. A correct API and a page that
+        ignores it would still be a broken product.
+    """
+    from testkit.selectors import UI
+
+    LoginPage(page, ui_url).open()
+
+    expect(page.locator(UI.common.product_name_css)).to_have_text(tenant.product_name)
+
+
+def test_a_paid_feature_appears_only_for_customers_who_bought_it(signed_in, page, tenant):
+    """The bulk-delete button is visible for Customer A and absent for B.
+
+    IMPORTANT: THIS IS NOT THE SECURITY TEST
+        Hiding a button stops nobody - anyone can call the endpoint
+        directly. The real guard is asserted in
+        suites/component/test_tenant_isolation.py, which calls the API as a
+        customer without the feature and requires a 403.
+
+        This test covers the other half: that the interface reflects what
+        the customer has actually bought, so Customer B is not shown a
+        button that would only fail if they pressed it.
+    """
+    from testkit.selectors import UI
+
+    button = page.locator(UI.tasks.bulk_delete_css)
+
+    if tenant.has_feature("bulk_delete"):
+        expect(button).to_be_visible()
+    else:
+        expect(button).to_be_hidden()

@@ -16,6 +16,14 @@ from enum import StrEnum
 
 
 class TaskStatus(StrEnum):
+    """The three states a task can be in.
+
+    StrEnum rather than a plain Enum so a member compares equal to its own
+    string. That means the value can go straight into the database and into
+    JSON without anyone remembering to write `.value`, while the code still
+    gets autocomplete and typo protection.
+    """
+
     TODO = "todo"
     IN_PROGRESS = "in_progress"
     DONE = "done"
@@ -53,6 +61,15 @@ def normalise_title(raw: str) -> str:
 
 
 def validate_title(raw: str) -> str:
+    """Tidy a title and confirm it is usable, or say precisely what is wrong.
+
+    ORDER MATTERS HERE
+        Normalising happens BEFORE the emptiness check. A title of "   "
+        should be rejected as empty - checking the raw string first would
+        see three characters and wave it through.
+
+    Raises RuleViolation with a stable code the API turns into a 422.
+    """
     title = normalise_title(raw)
     if len(title) < TITLE_MIN_LENGTH:
         raise RuleViolation("title_empty", "Title must not be empty")
@@ -64,6 +81,13 @@ def validate_title(raw: str) -> str:
 
 
 def validate_description(raw: str | None) -> str:
+    """Check the description, turning "not supplied" into an empty string.
+
+    Returning "" rather than None is deliberate: the API contract declares
+    description as a plain string, so a null would break every client
+    generated from that contract. Normalise the absence here, once, rather
+    than making every consumer handle two kinds of nothing.
+    """
     if raw is None:
         return ""
     if len(raw) > DESCRIPTION_MAX_LENGTH:
@@ -75,12 +99,25 @@ def validate_description(raw: str | None) -> str:
 
 
 def can_transition(current: TaskStatus, target: TaskStatus) -> bool:
+    """Is this status change allowed?
+
+    Re-stating the status a task already has counts as allowed. Clients
+    routinely send back every field including unchanged ones, and rejecting
+    that would make a perfectly reasonable update fail for no reason.
+    """
     if current == target:
         return True  # idempotent no-op: re-sending the current status is not an error
     return target in ALLOWED_TRANSITIONS[current]
 
 
 def validate_transition(current: TaskStatus, target: TaskStatus) -> TaskStatus:
+    """Same check as can_transition, but raise instead of returning False.
+
+    Two functions for one rule because callers need different things: a
+    test asking "is this legal?" wants a boolean, while a request handler
+    wants to stop immediately with an error the user can act on. The error
+    lists what WAS allowed, so the caller is not left guessing.
+    """
     if not can_transition(current, target):
         allowed = ", ".join(sorted(s.value for s in ALLOWED_TRANSITIONS[current]))
         raise RuleViolation(

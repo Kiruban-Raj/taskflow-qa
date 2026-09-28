@@ -39,10 +39,23 @@ class _Group(SimpleNamespace):
         )
 
     def css(self, key: str) -> str:
+        """Build a CSS selector for a testid looked up by name at runtime.
+
+        Most code should prefer the generated `<name>_css` attribute, which
+        fails at import time if the name is wrong. This exists for the rare
+        case where the key is computed rather than written literally.
+        """
         return f'[data-testid="{getattr(self, key)}"]'
 
 
 def _load() -> SimpleNamespace:
+    """Read the UI contract and turn each section into an attribute holder.
+
+    Runs once, at import. That timing is the whole point: a renamed testid
+    becomes an error the moment the test module is imported, naming the
+    attribute, instead of a thirty-second "element not found" timeout in
+    the middle of a browser run.
+    """
     path = repo_root() / "contracts" / "ui-contract.yaml"
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return SimpleNamespace(

@@ -8,7 +8,7 @@
 </head>
 <body>
   <header class="topbar">
-    <strong>TaskFlow</strong>
+    <strong data-testid="product-name" id="product-name">TaskFlow</strong>
     <span class="spacer"></span>
     <span data-testid="current-user" id="current-user"></span>
     <button data-testid="logout-button" id="logout-button">Log out</button>
@@ -31,6 +31,13 @@
         <option value="done">Done</option>
       </select>
     </div>
+
+    <!-- Rendered only when this customer has bought the feature. The button
+         being hidden is a convenience, NOT the access control - the server
+         refuses the call regardless of what this page shows. -->
+    <button id="bulk-delete" data-testid="bulk-delete" class="secondary" hidden>
+      Delete all done
+    </button>
 
     <p id="empty-state" data-testid="empty-state" hidden>No tasks yet.</p>
     <ul id="task-list" data-testid="task-list"></ul>

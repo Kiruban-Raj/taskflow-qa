@@ -8,7 +8,7 @@ is **where each test lives and why**, and a simple domain keeps that visible
 instead of hiding it behind business complexity.
 
 ```
-107 tests · 4 layers · every layer under its time budget
+132 tests · 4 layers · 2 customers · every layer under its time budget
 ```
 
 ---
@@ -39,9 +39,9 @@ So the design question for any new test is never "does this pass?" but
 | Layer | What it proves | I/O allowed | Budget | Count |
 |---|---|---|---|---|
 | **Unit** (`suites/unit`) | Domain rules in isolation | None | 15s | 39 |
-| **Contract** (`suites/contract`) | Implementation matches `contracts/openapi.yaml` | In-process | 30s | 15 |
-| **Component** (`suites/component`) | Endpoints apply the rules, persist, isolate tenants | In-process + DB | 60s | 44 |
-| **Journey** (`suites/journey`) | Real browser, real navigation, real storage | Full stack | 300s | 9 |
+| **Contract** (`suites/contract`) | Implementation matches `contracts/openapi.yaml` | In-process | 30s | 13 |
+| **Component** (`suites/component`) | Endpoints apply the rules, persist, isolate tenants | In-process + DB | 60s | 58 |
+| **Journey** (`suites/journey`) | Real browser, real navigation, real storage | Full stack | 300s | 11 × 2 |
 
 The shape is a pyramid by construction, not by intention — and it is **enforced**
 (see "Time budgets" below).
@@ -100,6 +100,63 @@ structurally can: real navigation, real `localStorage`, real rendering.
 Selectors come from `contracts/ui-contract.yaml` via generated constants, so a
 renamed `data-testid` is an **import-time error naming the attribute**, not a
 thirty-second timeout in a browser.
+
+---
+
+## Multi-tenancy
+
+Two customers share one deployment and one set of endpoints, reaching it at
+different addresses:
+
+| | Customer A | Customer B |
+|---|---|---|
+| Address | `custa.taskflow.local` | `custb.taskflow.local` |
+| Branding | Acme Tasks | Globex Planner |
+| Bulk delete | bought | not bought |
+
+Each is one file in `tenants/`. **Onboarding a customer is adding
+`tenants/custc.yaml` — nothing else.** No branch, no fork, no new test suite.
+CI picks it up because the matrix is generated from the directory listing.
+
+### The security boundary
+
+Which customer a request belongs to is decided from the **Host header, and
+nothing else** — never a query parameter or a header like `X-Tenant-Id`,
+because the caller chooses those. If tenant identity were selectable by the
+client, Customer A could simply ask to be Customer B and every isolation
+guarantee would be decorative. There is a test that tries exactly that attack.
+
+`suites/component/test_tenant_isolation.py` covers five routes in:
+
+1. Using a valid token at the wrong customer's address
+2. Asking to be another customer via a request header
+3. Guessing a record id belonging to another customer
+4. Reusing another customer's username and password
+5. Calling a paid feature you have not paid for
+
+### What multiplies, and what does not
+
+The trap is running the whole suite per customer: 2 customers, 2× the
+pipeline; 20 customers, a dead pipeline.
+
+| Layer | Per customer? | Why |
+|---|---|---|
+| Unit | **Once** | Pure rules — no tenant concept exists in them |
+| Contract | **Once** | Same endpoints, one API contract |
+| Component | **Once** + isolation tests | Rules apply identically; the *relationship* is what needs testing |
+| Journey | **Per customer** | The address, branding and visible features genuinely differ |
+
+So a second customer costs one extra 11-test browser run, not another 121
+tests.
+
+### How the browser reaches two hostnames
+
+`custa.taskflow.local` is not in DNS, and editing the machine's hosts file
+needs admin rights and differs per machine. Instead Chromium is launched with
+`--host-resolver-rules`, generated from the tenant files, which maps those
+names to `127.0.0.1` inside the browser only. The API-level transports
+connect to `127.0.0.1` while sending the customer's `Host` header — which is
+exactly what a reverse proxy does in production.
 
 ---
 
@@ -169,9 +226,9 @@ python -m venv .venv && source .venv/bin/activate   # macOS / Linux
 
 pip install -e ".[test]" -e libs/testkit
 
-pytest suites/unit          # 39 tests, ~5s
-pytest suites/contract      # 15 tests, ~2s
-pytest suites/component     # 44 tests, ~15s
+pytest suites/unit          # 39 tests, ~1s
+pytest suites/contract      # 13 tests, ~3s
+pytest suites/component     # 58 tests, ~17s
 ```
 
 For the browser layer:
@@ -179,7 +236,8 @@ For the browser layer:
 ```bash
 pip install -e ".[test,journey]"
 python -m playwright install chromium
-pytest suites/journey       # 9 tests, ~10s — starts its own server
+pytest suites/journey                  # 22 tests (11 × 2 customers), ~20s
+pytest suites/journey --tenant custa   # just one customer, ~11s
 ```
 
 The journey suite starts a server on a free port automatically. Point it at a
@@ -247,6 +305,7 @@ of an undrained pipe.
 
 ```
 contracts/       openapi.yaml + ui-contract.yaml — the source of truth
+tenants/         one file per customer; adding one is the whole onboarding
 app/             the application under test (FastAPI + a small vanilla-JS UI)
   rules.py       every domain decision, pure and I/O-free
 libs/testkit/    the shared test substrate, installed as a package

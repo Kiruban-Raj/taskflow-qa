@@ -29,6 +29,10 @@ const Api = {
     return payload;
   },
 
+  // Who are we serving? Resolved by the server from the address this page
+  // was loaded from, so the page never has to know or guess the customer.
+  tenant: () => Api.request("GET", "/tenant"),
+
   login: (username, password) => Api.request("POST", "/auth/login", { username, password }),
   logout: () => Api.request("POST", "/auth/logout"),
   me: () => Api.request("GET", "/me"),
@@ -36,7 +40,27 @@ const Api = {
   createTask: (title, description) => Api.request("POST", "/tasks", { title, description }),
   updateTask: (id, patch) => Api.request("PATCH", `/tasks/${id}`, patch),
   deleteTask: (id) => Api.request("DELETE", `/tasks/${id}`),
+  bulkDeleteDone: () => Api.request("POST", "/tasks/bulk-delete"),
 };
+
+// Apply this customer's branding to whichever page is open.
+//
+// Branding is fetched rather than hardcoded so that onboarding a customer
+// stays a config change. Three copies of the HTML with different logos is
+// the thing this avoids.
+async function applyBranding() {
+  try {
+    const tenant = await Api.tenant();
+    const name = document.getElementById("product-name");
+    if (name) name.textContent = tenant.product_name;
+    document.title = tenant.product_name;
+    return tenant;
+  } catch {
+    // Branding is decoration. If it fails, the page must still work -
+    // never let a cosmetic call block signing in.
+    return null;
+  }
+}
 
 function clearSession() {
   localStorage.removeItem("access_token");

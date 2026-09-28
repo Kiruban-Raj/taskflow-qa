@@ -11,13 +11,65 @@
 openapi: 3.0.3
 info:
   title: TaskFlow API
-  version: 1.0.0
-  description: A deliberately small task manager - login, logout, and CRUD over tasks.
+  version: 1.1.0
+  description: A small multi-tenant task manager - login, logout, and CRUD over tasks.
 
 servers:
   - url: http://127.0.0.1:8000
 
 paths:
+  /tenant:
+    get:
+      tags: [tenant]
+      summary: Branding and enabled features for the customer owning this address
+      description: >
+        Which customer a request belongs to is decided from the Host header
+        alone - never from a query parameter or a caller-supplied header,
+        because the caller chooses those. An unrecognised host is a 404
+        rather than a default, so a DNS mistake fails loudly instead of
+        serving one customer's data under another's address.
+      responses:
+        "200":
+          description: The current customer
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TenantResponse" }
+        "404":
+          description: No customer is configured for this address
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /tasks/bulk-delete:
+    post:
+      tags: [tasks]
+      summary: Delete all of the caller's finished tasks
+      description: >
+        An optional paid feature. Enforced on the server, not by hiding the
+        button - a customer without the feature gets 403 even if they call
+        the endpoint directly.
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: How many tasks were removed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: integer }
+        "401":
+          description: Not authenticated, or the token belongs to another customer
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: This customer has not enabled bulk delete
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
   /auth/login:
     post:
       tags: [auth]
@@ -217,10 +269,29 @@ components:
 
     UserResponse:
       type: object
-      required: [id, username]
+      required: [id, username, tenant_id]
       properties:
         id: { type: string }
         username: { type: string }
+        tenant_id:
+          type: string
+          description: Which customer this user belongs to.
+
+    TenantResponse:
+      type: object
+      required: [id, display_name, product_name, accent_colour, features]
+      description: >
+        A customer's public configuration. Mirrors tenants/<id>.yaml, and a
+        certification test asserts the two agree - configuration that claims
+        one thing while the code does another is the failure this guards.
+      properties:
+        id: { type: string }
+        display_name: { type: string }
+        product_name: { type: string }
+        accent_colour: { type: string }
+        features:
+          type: array
+          items: { type: string }
 
     TaskCreateRequest:
       type: object

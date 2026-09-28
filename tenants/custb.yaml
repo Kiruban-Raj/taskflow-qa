@@ -1,0 +1,27 @@
+# ---------------------------------------------------------------------------
+# Tenant: Customer B ("Globex")
+#
+# Deliberately different from Customer A in every dimension that matters, so
+# the cross-tenant tests are actually proving something:
+#   - different hostname   -> proves tenant routing works
+#   - different branding   -> proves the UI is driven by config, not hardcoded
+#   - fewer features       -> proves a feature is genuinely refused, not just
+#                             hidden in the interface
+#
+# A test suite where every tenant is configured identically cannot tell you
+# whether tenancy works at all.
+# ---------------------------------------------------------------------------
+
+id: custb
+display_name: Globex
+
+hostname: custb.taskflow.local
+
+branding:
+  product_name: Globex Planner
+  accent_colour: "#d64545"
+
+# Intentionally empty. Customer B has NOT bought bulk delete, so the tests
+# assert the endpoint refuses them with 403 - not merely that the button is
+# missing from the page. Hiding a button is not access control.
+features: []

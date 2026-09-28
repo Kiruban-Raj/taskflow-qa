@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# Tenant: Customer A ("Acme Corp")
+#
+# WHAT THIS FILE IS FOR
+#   Everything that makes Customer A different from every other customer,
+#   in one place. Their web address, their branding, and which optional
+#   features they have paid for.
+#
+# HOW IT IS USED
+#   The application reads this to decide how to behave for requests arriving
+#   on Customer A's hostname. The test suite reads the SAME file to decide
+#   what to assert. Because both sides read one file, the tests can never
+#   drift away from what the application actually does.
+#
+# WHY IT IS A FILE AND NOT A BRANCH
+#   The tempting shortcut is a branch (or a fork) per customer. It always
+#   ends the same way: the branches drift, and every bug fix has to be
+#   cherry-picked N times. Customers belong in configuration, on one trunk.
+#   Onboarding Customer C should be adding custc.yaml - nothing else.
+# ---------------------------------------------------------------------------
+
+id: custa
+display_name: Acme Corp
+
+# The hostname this customer reaches us on. Tenant identity is derived from
+# this and nothing else - see the comment on resolve_tenant() in app/tenants.py
+# for why that matters so much.
+hostname: custa.taskflow.local
+
+branding:
+  product_name: Acme Tasks
+  accent_colour: "#2a6df4"
+
+# Optional features this customer has bought. The certification tests read
+# this list and check both directions: enabled features must work, and
+# disabled ones must be refused.
+features:
+  - bulk_delete

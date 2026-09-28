@@ -15,6 +15,7 @@ pytestmark = [pytest.mark.contract]
 
 @pytest.fixture(scope="session")
 def spec() -> dict:
+    """The hand-written contract, loaded once for the session."""
     return yaml.safe_load((repo_root() / "contracts" / "openapi.yaml").read_text(encoding="utf-8"))
 
 
@@ -27,6 +28,12 @@ def validate(spec):
     """
 
     def _validate(payload, schema_name: str):
+        """Check a payload against a named schema from the contract.
+
+        The components block is attached to each schema before validating, so
+        internal $ref lookups resolve locally without needing a
+        network-aware resolver.
+        """
         schema = dict(spec["components"]["schemas"][schema_name])
         schema["components"] = spec["components"]
         jsonschema.validate(payload, schema)
@@ -35,6 +42,7 @@ def validate(spec):
 
 
 def test_login_response_matches_contract(transport, user, validate):
+    """A real login response validates against the published TokenResponse."""
     response = transport.post(
         "/auth/login", json={"username": user.username, "password": user.password}
     )
@@ -43,18 +51,25 @@ def test_login_response_matches_contract(transport, user, validate):
 
 
 def test_me_response_matches_contract(transport, user, validate):
+    """A real /me response validates against the published UserResponse."""
     response = transport.get("/me", headers=user.headers)
     assert response.status_code == 200
     validate(response.json(), "UserResponse")
 
 
 def test_created_task_matches_contract(transport, user, validate):
+    """A freshly created task validates against the published TaskResponse."""
     response = transport.post("/tasks", json={"title": "Contract check"}, headers=user.headers)
     assert response.status_code == 201
     validate(response.json(), "TaskResponse")
 
 
 def test_task_list_entries_match_contract(transport, user, tasks, validate):
+    """Every entry in a list response validates, not just the first.
+
+    Checking one element would miss a field that only differs on later
+    records - which is exactly how serialisation bugs tend to show up.
+    """
     tasks.create_many(3)
     response = transport.get("/tasks", headers=user.headers)
     assert response.status_code == 200

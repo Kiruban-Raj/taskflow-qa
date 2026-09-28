@@ -23,16 +23,24 @@ UNDECLARED_BY_DESIGN = {"/openapi.json", "/docs", "/docs/oauth2-redirect", "/red
 
 @pytest.fixture(scope="session")
 def contract() -> dict:
+    """The hand-written contract - what we PROMISED the API looks like."""
     path = repo_root() / "contracts" / "openapi.yaml"
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
 @pytest.fixture(scope="session")
 def implemented(app_instance) -> dict:
+    """The schema FastAPI derives from the code - what the API actually is."""
     return app_instance.openapi()
 
 
 def _operations(spec: dict) -> set[tuple[str, str]]:
+    """Reduce a spec to a set of (path, METHOD) pairs for comparison.
+
+    Comparing sets rather than whole documents means the failure message
+    names precisely which operations differ, instead of dumping two large
+    nested dictionaries and leaving you to diff them by eye.
+    """
     methods = {"get", "post", "put", "patch", "delete"}
     return {
         (path, method.upper())
